@@ -1,9 +1,9 @@
-name: Build custom tket2 wheel for supported platforms
+name: Build custom tket2 wheel
 on: 
   workflow_dispatch:
     inputs:
       tag:
-        description: 'branch, tag or SHA of hte tket2 repo to check out and build wheel from'
+        description: 'branch/tag/SHA of tket2 repo to check out and build'
         required: true
 
 jobs:
@@ -19,6 +19,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version-file: "tket-py/pyproject.toml"
+
+      - name: Enable cargo cache
+        uses: Swatinem/rust-cache@v2
           
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -27,10 +30,30 @@ jobs:
           args: --release --out ../dist --find-interpreter
           sccache: 'true'
           working-directory: tket-py
+        env:
+          READ_ONLY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload wheels
+      - name: Upload wheel
         uses: actions/upload-artifact@v4
         with:
           name: wheels-macos-aarch64
           path: dist
 
+  create-release:
+    needs: macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download macos wheel artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: wheels-macos-aarch64
+          path: dist
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          files: dist/*.whl
