@@ -1,0 +1,36 @@
+name: Build custom tket2 wheel for supported platforms
+on: 
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'branch, tag or SHA of hte tket2 repo to check out and build wheel from'
+        required: true
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: CQCL/tket2
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "tket-py/pyproject.toml"
+          
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: aarch64
+          args: --release --out ../dist --find-interpreter
+          sccache: 'true'
+          working-directory: tket-py
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-aarch64
+          path: dist
+
