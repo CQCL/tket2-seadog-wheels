@@ -39,16 +39,149 @@ jobs:
           name: wheels-macos-aarch64
           path: dist
 
+  linux:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64
+          # - runner: ubuntu-latest
+          #   target: x86
+          # - runner: ubuntu-latest
+          #   target: aarch64
+          # - runner: ubuntu-latest
+          #   target: armv7
+          # - runner: ubuntu-latest
+          #   target: s390x
+          # - runner: ubuntu-latest
+          #   target: ppc64le
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: CQCL/tket2
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "tket-py/pyproject.toml"
+
+      - name: Enable cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out ../dist --find-interpreter
+          sccache: 'true'
+          manylinux: manylinux_2_28 # default image is too old (need clang 9)
+          working-directory: tket-py
+          # make sure openssl and clang are installed in container image
+          before-script-linux: "if command -v yum &> /dev/null; then yum install -y openssl openssl-devel pkgconfig clang-devel; else apt-get update && apt-get install -y openssl libssl-dev pkg-config libclang-dev; fi"
+        env:
+          READ_ONLY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-${{ matrix.platform.target }}
+          path: dist
+
+  musllinux:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64
+          # - runner: ubuntu-latest
+          #   target: x86
+          # - runner: ubuntu-latest
+          #   target: aarch64
+          # - runner: ubuntu-latest
+          #   target: armv7
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: CQCL/tket2
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "tket-py/pyproject.toml"
+
+      - name: Enable cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out ../dist --find-interpreter
+          sccache: 'true'
+          manylinux: musllinux_1_2
+          working-directory: tket-py
+          before-script-linux: "if command -v yum &> /dev/null; then yum install -y openssl openssl-devel pkgconfig; else apt-get update && apt-get install -y openssl libssl-dev pkg-config; fi"
+        env:
+          # make sure openssl is installed in container image
+          READ_ONLY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-musllinux-${{ matrix.platform.target }}
+          path: dist
+
+  windows:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+          - runner: windows-latest
+            target: x64
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: CQCL/tket2
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "tket-py/pyproject.toml"
+          architecture: ${{ matrix.platform.target }}
+
+      - name: Enable cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out ../dist --find-interpreter
+          sccache: 'true'
+          working-directory: tket-py
+        env:
+          READ_ONLY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-${{ matrix.platform.target }}
+          path: dist
+
   create-release:
-    needs: macos
+    needs: [macos, linux, musllinux, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download macos wheel artifact
+      - name: Download wheel artifacts
         uses: actions/download-artifact@v5
         with:
-          name: wheels-macos-aarch64
           path: dist
 
       - name: Create GitHub Release
