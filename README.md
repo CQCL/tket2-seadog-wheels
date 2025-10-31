@@ -16,6 +16,9 @@ Note: Badger used to work differently (and as of 31/10/25, tket2/main and all re
 3. This is where the optimiser comes in: it must figure out which rewrites can be applied in parallel (versus which overlap and thus are mutually exclusive) and which set of rewrites lead to the best optimised computation. More than one rewriting step is typically necessary, which means the optimiser must explore the optimisation landscape by trying out multiple sets of rewrites, before choosing which one is the best.
 4. After rewrites have been applied, we return to generating new rewrites at step 2, repeating steps 2 and 3 until the optimiser deems that the optimum has been found (typically, no more progress is made or a timeout is reached).
 
+A much more detailed presentation of how Seadog works specifically can be gleaned from [Chapter 5](https://luca.mondada.net/dphil-thesis/05_parallel/) of this thesis.
+
+
 ### Code structure
 
 As it is not possible (or I was not smart enough) to split a python package with bindings to Rust code into two packages, all code lives within the [tket2](https://github.com/CQCL/tket2) repo, but not (yet) on main. As of 31/10/2025, the most up-to-date branch is `seadog/oct27`. You may want to check if there are more recent branches/tags that following this template.
@@ -23,9 +26,12 @@ As it is not possible (or I was not smart enough) to split a python package with
  The main modules of interest to us:
 
 - `tket/src/optimiser`: This contains the code for both new-badger and seadog. Both are fairly simple wrappers around a simple `BacktrackingOptimiser` (in `tket/src/optimiser/backtracking.rs)
-- `tket/src
+- `tket/src/rewrite_space`: Implements `RewriteSpace`, a core concept specifically for the seadog optimiser. The rewrite space keeps track of all sequences of rewrites that can be applied to the input. Filling this rewrite space will all options forms the first half of the seadog optimiser, called the "exploration phase".
+- `tket/src/
 
 ### How to release new versions of new-badger + seadog
+
+See recording of handover meeting with Dan and Maria. Within this repo (tket2-seadog-wheels), there is a CI script (found at `.github/workflows/build-wheels.yml`) that can be run to automatically build wheels of tket2 for a particular commit/tag of tket2. Go to "Actions -> Build custom tket2 wheel -> Run workflow -> Enter SHA/tag/branch name". When completed, the compiled binaries are found under [releases](https://github.com/CQCL/tket2-seadog-wheels/releases).
 
 
 ### Plan to merge new-badger into main:
@@ -35,7 +41,8 @@ The following features are ripe and should be merged into main over the next wee
 - [x] ResourceScope: a wrapper around Circuit (i.e. around Hugr) that computes and caches the lifetime of "resources", i.e. linear values that are passed to and output from operations.
 - [ ] Subcircuit: a new `struct` that defines subgraphs as intervals on ResourceScope. The advantage of this struct is that it provides the user using the Matcher API (see below) with qubit IDs (i.e. answers to the question, does gate X and gate Y apply to the same qubits). It also makes checking convexity cheap, so that we can check convexity at every step of the matching process. This provides a guarantee to the user of the matcher API that gates will be traversed "in order". [See PR](https://github.com/CQCL/tket2/pull/1054)
 - [ ] CircuitRewrite: Replaces the current `CircuitRewrite` (which is just a wrapper around hugr's `SimpleReplacement`) to a rewrite definition that uses `Subcircuit`s for the LHS. Fully making this change requires quite a few changes to the old-badger code, as well as to `portmatching` (the part of tket2 dedicated to pattern matching)
-- [ ] 
+- [ ] CircuitMatcher: a new Rust trait (along with a corresponding Python protocol mirroring the Rust API) that provides an API to match rewrite LHS one operation at a time. For each operation, the user can choose to match or skip an operation, thus "growing" matches, starting from a root node.
+- [ ] CircuitReplacer: a new Rust trait (along with a corresponding Python protocol mirroring the Rust API) that can be implemented to provide rewrite RHSs for matches obtained from a CircuitMatcher.
 
 
 ### Future research directions for Seadog
