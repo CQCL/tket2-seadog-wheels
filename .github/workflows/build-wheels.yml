@@ -181,12 +181,10 @@ jobs:
     steps:
       - name: Download wheel artifacts
         uses: actions/download-artifact@v5
-        with:
-          path: dist
 
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag }}
-          files: dist/*.whl
+          tag_name: tket2/${{ github.event.inputs.tag }}
+          files: wheels-*/*
